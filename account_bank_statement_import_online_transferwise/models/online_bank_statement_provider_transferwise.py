@@ -1,5 +1,5 @@
 # Copyright 2019 Brainbean Apps (https://brainbeanapps.com)
-# Copyright 2019 Dataplug (https://dataplug.io)
+# Copyright 2020 CorporateHub (https://corporatehub.eu)
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl.html).
 
 from dateutil.relativedelta import relativedelta
@@ -154,6 +154,7 @@ class OnlineBankStatementProviderTransferwise(models.Model):
 
     @api.model
     def _transferwise_transaction_to_lines(self, transaction):
+        transaction_type = transaction['type']
         reference_number = transaction['referenceNumber']
         details = transaction.get('details', {})
         exchange_details = transaction.get('exchangeDetails')
@@ -170,12 +171,15 @@ class OnlineBankStatementProviderTransferwise(models.Model):
             )
         amount = transaction['amount']
         amount_value = amount.get('value', 0)
-        fees_value = total_fees.get('value', Decimal()).copy_abs()
-        if amount_value.is_signed():
+        fees_value = total_fees.get('value', Decimal())
+        if transaction_type == 'CREDIT' \
+                and details.get('type') == 'MONEY_ADDED':
             fees_value = fees_value.copy_negate()
+        else:
+            fees_value = fees_value.copy_sign(amount_value)
         amount_value -= fees_value
         unique_import_id = '%s-%s-%s' % (
-            transaction['type'],
+            transaction_type,
             reference_number,
             int(date.timestamp()),
         )
